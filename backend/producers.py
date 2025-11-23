@@ -4,7 +4,7 @@ import json
 import math
 import os
 from kafka import KafkaProducer
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 # Load environment variables from the parent directory
@@ -32,7 +32,7 @@ def sensor_simulation(sensor_id, lock):
     
     try:
         while True:
-            timestamp = datetime.utcnow().isoformat()
+            timestamp = datetime.now(timezone.utc).isoformat()
             # Generate Sine wave value based on time
             # Using time.time() ensures the wave progresses
             # Offset the phase by sensor_id so they aren't identical
