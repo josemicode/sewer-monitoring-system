@@ -1,3 +1,10 @@
 kafka-python
 influxdb-client
 python-dotenv
+fastapi
+uvicorn
+sqlalchemy
+aiokafka
+passlib
+bcrypt
+python-multipart
