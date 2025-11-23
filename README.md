@@ -30,3 +30,20 @@ curl -I http://localhost:8086/health; docker exec kafka kafka-topics --bootstrap
 
 - InfluxDB: http://localhost:8086
 - Portainer: http://localhost:9000
+
+5. Install backend dependencies:
+
+- Go to backend and run this command to get a virtual enviroment for pip packages.
+(And source it to use it)
+
+```bash
+python -m venv venv
+```
+```bash
+source venv/bin/activate
+```
+
+- Now install the libraries
+```bash
+pip install -r requirements.txt
+```
