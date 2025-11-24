@@ -47,3 +47,18 @@ source venv/bin/activate
 ```bash
 pip install -r requirements.txt
 ```
+
+6. Run both the consumer and producer:
+
+```bash
+python consumer.py
+```
+(in another terminal)
+```bash
+python producers.py
+```
+
+You may now check system.log or run the following command to directly query InfluxDB:
+```bash
+docker exec -it influxdb influx query 'from(bucket: "${INFLUXDB_BUCKET}") |> range(start: -1h)'
+```

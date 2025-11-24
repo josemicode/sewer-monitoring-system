@@ -1,0 +1,2 @@
+- Allow reading history from multiple sensors
+- Separate history into two endpoints to expose: {'/history/raw', '/history/aggregated'}

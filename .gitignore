@@ -1,3 +1,5 @@
 .env
 venv/
 system.log
+alerts.db
+__pycache__/

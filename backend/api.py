@@ -217,8 +217,22 @@ def get_history(
     join(tables: {{min: min, max: max, mean: mean}}, on: ["_time", "sensor_id"])
     '''
     
-    result = query_api.query(query=query, org=INFLUXDB_ORG)
-    
+    #result = query_api.query(query=query, org=INFLUXDB_ORG)
+
+    base = f'''
+    from(bucket: "{INFLUXDB_BUCKET}")
+      |> range(start: {start_date})
+      |> filter(fn: (r) => r["_measurement"] == "sensor_reading")
+      |> filter(fn: (r) => r["_field"] == "value")
+      |> group(columns: ["sensor_id"])
+      |> aggregateWindow(every: {window_period}, fn: {{fn}}, createEmpty: false)
+    '''
+
+    min_result = query_api.query(query=base.format(fn="min"), org=INFLUXDB_ORG)
+    max_result = query_api.query(query=base.format(fn="max"), org=INFLUXDB_ORG)
+    mean_result = query_api.query(query=base.format(fn="mean"), org=INFLUXDB_ORG)
+
+    ''' 
     output = []
     for table in result:
         for record in table.records:
@@ -229,6 +243,18 @@ def get_history(
                 "max": record.values.get("_value_max"),
                 "avg": record.values.get("_value_mean")
             })
+    '''
+
+    # Merge results by timestamp
+    output = []
+    for m, x, a in zip(min_result[0].records, max_result[0].records, mean_result[0].records):
+        output.append({
+            "time": m.get_time(),
+            "sensor_id": m.values.get("sensor_id"),
+            "min": m.get_value(),
+            "max": x.get_value(),
+            "avg": a.get_value()
+        })
             
     return output
 
