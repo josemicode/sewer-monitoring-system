@@ -1,0 +1,65 @@
+This file contains some draft queries for InfluxDB
+query = f'''
+from(bucket: "{INFLUXDB_BUCKET}")
+    |> range(start: {start_date})
+    |> filter(fn: (r) => r["_measurement"] == "sensor_reading")
+    |> filter(fn: (r) => r["_field"] == "value")
+    |> window(every: {window_period})
+    |> reduce(fn: (r, accumulator) => ({{
+        count: r._value + accumulator.count,
+        total: r._value + accumulator.total,
+        min: if r._value < accumulator.min then r._value else accumulator.min,
+        max: if r._value > accumulator.max then r._value else accumulator.max
+    }}),
+    identity: {{count: 0.0, total: 0.0, min: 1000000.0, max: -1000000.0}}
+    )
+    |> map(fn: (r) => ({{
+        r with
+        avg: r.total / r.count
+    }}))
+'''
+
+# Note: The above reduce is complex. A simpler way is using standard aggregate functions.
+# Let's use standard mean, min, max for simplicity.
+
+query = f'''
+from(bucket: "{INFLUXDB_BUCKET}")
+    |> range(start: {start_date})
+    |> filter(fn: (r) => r["_measurement"] == "sensor_reading")
+    |> filter(fn: (r) => r["_field"] == "value")
+    |> aggregateWindow(every: {window_period}, fn: mean, createEmpty: false)
+    |> yield(name: "mean")
+'''
+
+# To get min, max, and avg together, we need to pivot or run multiple queries.
+# For this assignment, let's just return the MEAN (avg) to keep it working reliably.
+# Or we can do a fieldsAsCols approach if we had multiple fields.
+
+# Better approach for "min, max, avg":
+query = f'''
+data = from(bucket: "{INFLUXDB_BUCKET}")
+    |> range(start: {start_date})
+    |> filter(fn: (r) => r["_measurement"] == "sensor_reading")
+    |> filter(fn: (r) => r["_field"] == "value")
+
+min = data |> aggregateWindow(every: {window_period}, fn: min, createEmpty: false)
+max = data |> aggregateWindow(every: {window_period}, fn: max, createEmpty: false)
+mean = data |> aggregateWindow(every: {window_period}, fn: mean, createEmpty: false)
+
+join(tables: {{min: min, max: max, mean: mean}}, on: ["_time", "sensor_id"])
+'''
+
+''' 
+output = []
+for table in result:
+    for record in table.records:
+        output.append({
+            "time": record.get_time(),
+            "sensor_id": record.values.get("sensor_id"),
+            "min": record.values.get("_value_min"),
+            "max": record.values.get("_value_max"),
+            "avg": record.values.get("_value_mean")
+        })
+'''
+
+#result = query_api.query(query=query, org=INFLUXDB_ORG)

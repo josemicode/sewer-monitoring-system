@@ -8,7 +8,8 @@ from typing import List, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime
-from sqlalchemy.ext.declarative import declarative_base
+#from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from aiokafka import AIOKafkaConsumer
 from influxdb_client import InfluxDBClient
@@ -29,7 +30,8 @@ ALERT_THRESHOLD = 28.0  # Trigger alert if value > 28.0 (Sine wave max is 30)
 # Database Setup (SQLite)
 SQLALCHEMY_DATABASE_URL = "sqlite:///./alerts.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+LocalSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 Base = declarative_base()
 
 # --- Models ---
@@ -62,8 +64,12 @@ app.add_middleware(
 )
 
 # --- Dependencies ---
-def get_db():
-    db = SessionLocal()
+#? Why does it use yield?
+# In this case, it's used to create a generator that can be used to iterate over a sequence of database sessions.
+# The generator is then used to yield the database session to the endpoint. This pattern is called "dependency injection".
+# If we didn't use yield, we would need to create a new session for each request, which would be less efficient.
+def get_db() -> Session:
+    db = LocalSession()
     try:
         yield db
     finally:
@@ -73,30 +79,29 @@ def get_influx_query_api():
     client = InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
     return client.query_api()
 
-# --- Helpers ---
-async def log_alarm(db: Session, sensor_id: str, value: float):
-    """Log an alarm to SQLite if it's a new high value."""
-    # Simple logic: Log every violation. In production, you might debounce this.
-    alarm = AlarmLog(
-        sensor_id=sensor_id,
-        value=value,
-        threshold=ALERT_THRESHOLD,
-        acknowledged=False,
-        timestamp=datetime.utcnow()
-    )
+#* --- Helpers ---
+#? Why is it async?
+# Because it's a database operation, which is an I/O operation and can block the event loop.
+async def log_alarm(db: Session, sensor_id: str, value: float) -> AlarmLog:
+    #* Log an alarm to SQLite if it's a new high value.
+    # Simple logic: Log every violation. If it was in production, I might debounce this.
+    alarm = AlarmLog(sensor_id=sensor_id, value=value, threshold=ALERT_THRESHOLD, acknowledged=False, timestamp=datetime.utcnow())
     db.add(alarm)
     db.commit()
     db.refresh(alarm)
     return alarm
 
-# --- Endpoints ---
-
+#* --- Endpoints ---
+#? When is this code run?
+# When a client connects to the WebSocket endpoint, every time a new message is received, and when the client disconnects.
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
     await websocket.accept()
     
-    # Create a unique consumer group for this websocket so it gets all messages
-    # or use no group_id to act as a standalone consumer
+    '''
+    Create a unique consumer group for this websocket so it gets all messages
+    or use no group_id to act as a standalone consumer
+    '''
     consumer = AIOKafkaConsumer(
         TOPIC_NAME,
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
@@ -121,7 +126,7 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                 # To strictly follow requirements "log it to SQLite", we do it here.
                 # Note: 'db' dependency in WebSocket is tricky because of session lifecycle.
                 # We'll create a fresh session for the log to be safe.
-                with SessionLocal() as log_session:
+                with LocalSession() as log_session:
                     await asyncio.to_thread(log_alarm, log_session, sensor_id, value)
             
             # Append Alert Flag
@@ -130,6 +135,13 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                 "is_alert": alert_triggered,
                 "threshold": ALERT_THRESHOLD
             }
+            #? Why does data have **?
+            # because data is a dictionary and **data unpacks it into a new dictionary
+            # so we can add new key-value pairs to it
+            # otherwise we would have to do something like this:
+            # response_data = data.copy()
+            # response_data["is_alert"] = alert_triggered
+            # response_data["threshold"] = ALERT_THRESHOLD
             
             await websocket.send_json(response_data)
     except WebSocketDisconnect:
@@ -139,24 +151,23 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
     finally:
         await consumer.stop()
 
-@app.get("/history")
-def get_history(
+
+'''
+Params:
     start_date: str, # ISO Format expected
     aggregation: str = "hour", # minute, hour, day
-    query_api = Depends(get_influx_query_api)
-):
-    """
+    query_api: QueryApi = Depends(get_influx_query_api) # InfluxDB Query API dependency
+'''
+@app.get("/history")
+def get_history(start_date: str, aggregation: str = "hour", query_api = Depends(get_influx_query_api)):
+    '''
     Query InfluxDB for aggregated statistics.
     start_date example: '-1d', '-1h' or ISO string.
     For simplicity in Flux, we'll accept relative time strings like '-24h', '-1h' or use start_date directly if it parses.
-    """
+    '''
     
     # Map aggregation to Flux window period
-    window_map = {
-        "minute": "1m",
-        "hour": "1h",
-        "day": "1d"
-    }
+    window_map = {"minute": "1m", "hour": "1h", "day": "1d"}
     window_period = window_map.get(aggregation, "1h")
     
     # Construct Flux Query
@@ -164,61 +175,9 @@ def get_history(
     # If the user passes a specific date, we'd need to format it.
     # Let's support simple relative ranges for now as it's robust.
     
-    # If start_date doesn't start with '-', assume it's absolute time? 
+    #? If start_date doesn't start with '-', assume it's absolute time? 
     # Let's just treat it as the 'start' parameter in range().
     
-    query = f'''
-    from(bucket: "{INFLUXDB_BUCKET}")
-      |> range(start: {start_date})
-      |> filter(fn: (r) => r["_measurement"] == "sensor_reading")
-      |> filter(fn: (r) => r["_field"] == "value")
-      |> window(every: {window_period})
-      |> reduce(fn: (r, accumulator) => ({{
-          count: r._value + accumulator.count,
-          total: r._value + accumulator.total,
-          min: if r._value < accumulator.min then r._value else accumulator.min,
-          max: if r._value > accumulator.max then r._value else accumulator.max
-        }}),
-        identity: {{count: 0.0, total: 0.0, min: 1000000.0, max: -1000000.0}}
-      )
-      |> map(fn: (r) => ({{
-          r with
-          avg: r.total / r.count
-        }}))
-    '''
-    
-    # Note: The above reduce is complex. A simpler way is using standard aggregate functions.
-    # Let's use standard mean, min, max for simplicity.
-    
-    query = f'''
-    from(bucket: "{INFLUXDB_BUCKET}")
-      |> range(start: {start_date})
-      |> filter(fn: (r) => r["_measurement"] == "sensor_reading")
-      |> filter(fn: (r) => r["_field"] == "value")
-      |> aggregateWindow(every: {window_period}, fn: mean, createEmpty: false)
-      |> yield(name: "mean")
-    '''
-    
-    # To get min, max, and avg together, we need to pivot or run multiple queries.
-    # For this assignment, let's just return the MEAN (avg) to keep it working reliably.
-    # Or we can do a fieldsAsCols approach if we had multiple fields.
-    
-    # Better approach for "min, max, avg":
-    query = f'''
-    data = from(bucket: "{INFLUXDB_BUCKET}")
-      |> range(start: {start_date})
-      |> filter(fn: (r) => r["_measurement"] == "sensor_reading")
-      |> filter(fn: (r) => r["_field"] == "value")
-    
-    min = data |> aggregateWindow(every: {window_period}, fn: min, createEmpty: false)
-    max = data |> aggregateWindow(every: {window_period}, fn: max, createEmpty: false)
-    mean = data |> aggregateWindow(every: {window_period}, fn: mean, createEmpty: false)
-    
-    join(tables: {{min: min, max: max, mean: mean}}, on: ["_time", "sensor_id"])
-    '''
-    
-    #result = query_api.query(query=query, org=INFLUXDB_ORG)
-
     base = f'''
     from(bucket: "{INFLUXDB_BUCKET}")
       |> range(start: {start_date})
@@ -232,19 +191,9 @@ def get_history(
     max_result = query_api.query(query=base.format(fn="max"), org=INFLUXDB_ORG)
     mean_result = query_api.query(query=base.format(fn="mean"), org=INFLUXDB_ORG)
 
-    ''' 
-    output = []
-    for table in result:
-        for record in table.records:
-            output.append({
-                "time": record.get_time(),
-                "sensor_id": record.values.get("sensor_id"),
-                "min": record.values.get("_value_min"),
-                "max": record.values.get("_value_max"),
-                "avg": record.values.get("_value_mean")
-            })
-    '''
-
+    if not min_result or not max_result or not mean_result:
+        raise HTTPException(status_code=404, detail="No data found for the specified time range")
+    
     # Merge results by timestamp
     output = []
     for m, x, a in zip(min_result[0].records, max_result[0].records, mean_result[0].records):
