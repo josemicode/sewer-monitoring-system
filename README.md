@@ -62,3 +62,23 @@ You may now check system.log or run the following command to directly query Infl
 ```bash
 docker exec -it influxdb influx query 'from(bucket: "${INFLUXDB_BUCKET}") |> range(start: -1h)'
 ```
+
+7. Test the API:
+- Run the api.py file
+- Access th Swagger UI at http://localhost:8000/docs
+- Test the endpoints, Example (get the aggregated data for the last hour):
+```bash
+curl -X 'GET' \
+  'http://localhost:8000/history/aggregated?start_date=-1h&aggregation=hour' \
+  -H 'accept: application/json'
+```
+
+8. Install Node dependencies and run the frontend:
+- Go to frontend and run this command
+```bash
+npm install
+```
+- Then run the Vite server (Access at http://localhost:5173)
+```bash
+npm run dev
+```
