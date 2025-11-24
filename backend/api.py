@@ -158,12 +158,11 @@ Params:
     aggregation: str = "hour", # minute, hour, day
     query_api: QueryApi = Depends(get_influx_query_api) # InfluxDB Query API dependency
 '''
-@app.get("/history")
-def get_history(start_date: str, aggregation: str = "hour", query_api = Depends(get_influx_query_api)):
+@app.get("/history/aggregated")
+def get_history_aggregated(start_date: str, aggregation: str = "hour", query_api = Depends(get_influx_query_api)):
     '''
     Query InfluxDB for aggregated statistics.
     start_date example: '-1d', '-1h' or ISO string.
-    For simplicity in Flux, we'll accept relative time strings like '-24h', '-1h' or use start_date directly if it parses.
     '''
     
     # Map aggregation to Flux window period
@@ -171,40 +170,75 @@ def get_history(start_date: str, aggregation: str = "hour", query_api = Depends(
     window_period = window_map.get(aggregation, "1h")
     
     # Construct Flux Query
-    # We'll assume start_date is a relative duration string for simplicity (e.g., "-24h")
-    # If the user passes a specific date, we'd need to format it.
-    # Let's support simple relative ranges for now as it's robust.
-    
-    #? If start_date doesn't start with '-', assume it's absolute time? 
-    # Let's just treat it as the 'start' parameter in range().
-    
-    base = f'''
-    from(bucket: "{INFLUXDB_BUCKET}")
+    # Use union and pivot to get all stats in one go and ensure time alignment
+    query = f'''
+    base = from(bucket: "{INFLUXDB_BUCKET}")
       |> range(start: {start_date})
       |> filter(fn: (r) => r["_measurement"] == "sensor_reading")
       |> filter(fn: (r) => r["_field"] == "value")
       |> group(columns: ["sensor_id"])
-      |> aggregateWindow(every: {window_period}, fn: {{fn}}, createEmpty: false)
+
+    min = base |> aggregateWindow(every: {window_period}, fn: min, createEmpty: false) |> map(fn: (r) => ({{r with _field: "min"}}))
+    max = base |> aggregateWindow(every: {window_period}, fn: max, createEmpty: false) |> map(fn: (r) => ({{r with _field: "max"}}))
+    mean = base |> aggregateWindow(every: {window_period}, fn: mean, createEmpty: false) |> map(fn: (r) => ({{r with _field: "mean"}}))
+
+    union(tables: [min, max, mean])
+      |> pivot(rowKey:["_time", "sensor_id"], columnKey: ["_field"], valueColumn: "_value")
     '''
 
-    min_result = query_api.query(query=base.format(fn="min"), org=INFLUXDB_ORG)
-    max_result = query_api.query(query=base.format(fn="max"), org=INFLUXDB_ORG)
-    mean_result = query_api.query(query=base.format(fn="mean"), org=INFLUXDB_ORG)
+    result = query_api.query(query=query, org=INFLUXDB_ORG)
 
-    if not min_result or not max_result or not mean_result:
+    if not result:
+        # I should raise an exception here. 404 Not Found, meaning no data was found for the specified time range
         raise HTTPException(status_code=404, detail="No data found for the specified time range")
-    
-    # Merge results by timestamp
+
     output = []
-    for m, x, a in zip(min_result[0].records, max_result[0].records, mean_result[0].records):
-        output.append({
-            "time": m.get_time(),
-            "sensor_id": m.values.get("sensor_id"),
-            "min": m.get_value(),
-            "max": x.get_value(),
-            "avg": a.get_value()
-        })
+    for table in result:
+        for record in table.records:
+            output.append({
+                "time": record.get_time(),
+                "sensor_id": record.values.get("sensor_id"),
+                "min": record.values.get("min"),
+                "max": record.values.get("max"),
+                "avg": record.values.get("mean")
+            })
+    
+    #? Why do we raise the same exception here?
+    # In case the query returns an empty list.
+    if not output:
+         raise HTTPException(status_code=404, detail="No data found for the specified time range")
+
+    return output
+
+@app.get("/history/raw")
+def get_history_raw(sensor_id: str, start_date: str, query_api = Depends(get_influx_query_api)):
+    '''
+    Query InfluxDB for raw sensor data.
+    '''
+    query = f'''
+    from(bucket: "{INFLUXDB_BUCKET}")
+      |> range(start: {start_date})
+      |> filter(fn: (r) => r["_measurement"] == "sensor_reading")
+      |> filter(fn: (r) => r["_field"] == "value")
+      |> filter(fn: (r) => r["sensor_id"] == "{sensor_id}")
+    '''
+    
+    result = query_api.query(query=query, org=INFLUXDB_ORG)
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="No data found for the specified time range and sensor")
+
+    output = []
+    for table in result:
+        for record in table.records:
+            output.append({
+                "time": record.get_time(),
+                "value": record.get_value()
+            })
             
+    if not output:
+        raise HTTPException(status_code=404, detail="No data found for the specified time range and sensor")
+        
     return output
 
 @app.post("/acknowledge/{alarm_id}")
@@ -218,6 +252,8 @@ def acknowledge_alarm(alarm_id: int, db: Session = Depends(get_db)):
     return {"status": "success", "message": f"Alarm {alarm_id} acknowledged"}
 
 @app.post("/users/")
+#? How to create a user?
+# curl -X POST "http://localhost:8000/users/" -H "Content-Type: application/json" -d '{"username": "testuser", "password_hash": "testpass"}'
 def create_user(username: str, password_hash: str, db: Session = Depends(get_db)):
     # Very basic user creation
     user = User(username=username, password_hash=password_hash)
