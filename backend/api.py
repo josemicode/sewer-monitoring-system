@@ -4,6 +4,7 @@ import asyncio
 import random
 from datetime import datetime, timedelta
 from typing import List, Optional
+from pydantic import BaseModel
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -265,6 +266,21 @@ def create_user(username: str, password_hash: str, db: Session = Depends(get_db)
     except Exception:
         db.rollback()
         raise HTTPException(status_code=400, detail="User already exists")
+
+#? Why use Pydantic models?
+# It benefits from type checking and validation
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/login")
+def login(request: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == request.username).first()
+
+    if not user or user.password_hash != request.password:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    return {"username": user.username, "id": user.id}
 
 if __name__ == "__main__":
     import uvicorn
