@@ -112,7 +112,13 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
         auto_offset_reset='latest'
     )
     
-    await consumer.start()
+    try:
+        await consumer.start()
+    except Exception as e:
+        print(f"Error starting Kafka consumer: {e}")
+        await websocket.close(code=1011)
+        return
+
     try:
         async for msg in consumer:
             data = json.loads(msg.value.decode('utf-8'))
@@ -152,6 +158,7 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
     except Exception as e:
         print(f"WebSocket Error: {e}")
     finally:
+        print("Stopping WebSocket consumer...")
         await consumer.stop()
 
 
@@ -193,7 +200,7 @@ def get_history_aggregated(start_date: str, aggregation: str = "hour", query_api
 
     if not result:
         # I should raise an exception here. 404 Not Found, meaning no data was found for the specified time range
-        raise HTTPException(status_code=404, detail="No data found for the specified time range")
+        raise HTTPException(status_code=404, detail="No data found for the specified time range. Ensure producers.py is running.")
 
     output = []
     for table in result:
@@ -209,7 +216,7 @@ def get_history_aggregated(start_date: str, aggregation: str = "hour", query_api
     #? Why do we raise the same exception here?
     # In case the query returns an empty list.
     if not output:
-         raise HTTPException(status_code=404, detail="No data found for the specified time range")
+         raise HTTPException(status_code=404, detail="No data found for the specified time range. Ensure producers.py is running.")
 
     return output
 
@@ -229,7 +236,7 @@ def get_history_raw(sensor_id: str, start_date: str, query_api = Depends(get_inf
     result = query_api.query(query=query, org=INFLUXDB_ORG)
     
     if not result:
-        raise HTTPException(status_code=404, detail="No data found for the specified time range and sensor")
+        raise HTTPException(status_code=404, detail="No data found for the specified time range and sensor. Are producers.py running?")
 
     output = []
     for table in result:
@@ -240,7 +247,7 @@ def get_history_raw(sensor_id: str, start_date: str, query_api = Depends(get_inf
             })
             
     if not output:
-        raise HTTPException(status_code=404, detail="No data found for the specified time range and sensor")
+        raise HTTPException(status_code=404, detail="No data found for the specified time range and sensor. Ensure producers.py is running.")
         
     return output
 
