@@ -8,3 +8,4 @@ aiokafka
 passlib
 bcrypt
 python-multipart
+websockets

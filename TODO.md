@@ -1,3 +1,9 @@
 - Make the threshold configurable
 - Add authentication
 - Create a dashboard frontend
+- Implement component resilience for:
+    - InfluxDB
+    - Consumer
+    - Producer
+- Fix the websocket connection
+- Make it so the sensor data is matched in time

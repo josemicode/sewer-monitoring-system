@@ -16,6 +16,8 @@ from aiokafka import AIOKafkaConsumer
 from influxdb_client import InfluxDBClient
 from dotenv import load_dotenv
 
+import uvicorn
+
 # Load env vars
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
@@ -283,5 +285,4 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     return {"username": user.username, "id": user.id}
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
