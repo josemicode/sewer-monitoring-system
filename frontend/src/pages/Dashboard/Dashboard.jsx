@@ -10,7 +10,7 @@ const SENSORS = ['sensor_0', 'sensor_1', 'sensor_2', 'sensor_3'];
 const COLORS = ['#7c3aed', '#ec4899', '#f59e0b', '#10b981'];
 
 const Dashboard = () => {
-    const { sensors, lastMessage } = useWebSocket();
+    const { sensors, lastMessage, thresholds, updateThreshold } = useWebSocket();
     const [timeRange, setTimeRange] = useState('-1h');
     const [historicalData, setHistoricalData] = useState({});
     const [aggregatedData, setAggregatedData] = useState([]);
@@ -136,6 +136,18 @@ const Dashboard = () => {
                             <div className={styles.value} style={{ color: COLORS[index] }}>
                                 {sensor ? sensor.value.toFixed(2) : '--'}
                             </div>
+
+                            <div className={styles.thresholdControl}>
+                                <label>Alert &gt;</label>
+                                <input
+                                    type="number"
+                                    value={thresholds[sensorId] || 28}
+                                    onChange={(e) => updateThreshold(sensorId, e.target.value)}
+                                    step="0.1"
+                                    className={styles.thresholdInput}
+                                />
+                            </div>
+
                             {sensor?.is_alert && (
                                 <div className={styles.alertBadge}>⚠️ Alert</div>
                             )}
