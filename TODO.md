@@ -1,9 +1,10 @@
 - Make the threshold configurable
-- Add authentication
-- Create a dashboard frontend
+- [x] Add authentication
+- [x] Create a dashboard frontend
 - Implement component resilience for:
     - InfluxDB
     - Consumer
     - Producer
-- Fix the websocket connection
-- Make it so the sensor data is matched in time
+- [x] Fix the websocket connection
+- [x] Make it so the sensor data is matched in time
+- The "Waiting for background tasks to complete. (CTRL+C to force quit)" incident

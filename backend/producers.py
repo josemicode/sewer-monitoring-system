@@ -32,11 +32,13 @@ def sensor_simulation(sensor_id, lock):
     
     try:
         while True:
-            timestamp = datetime.now(timezone.utc).isoformat()
+            # Align timestamp to the nearest second for graph alignment
+            now = datetime.now(timezone.utc)
+            timestamp = now.replace(microsecond=0).isoformat()
             # Generate Sine wave value based on time
             # Using time.time() ensures the wave progresses
-            # Offset the phase by sensor_id so they aren't identical
-            value = math.sin(time.time() + sensor_id) * 10 + 20 # Base 20, amplitude 10
+            # Restore phase shift as per user request, but keep amplitude variation
+            value = math.sin(time.time() + sensor_id) * (10 + sensor_id * 2) + 20 # Base 20, amplitude 10
             
             data = {
                 "sensor_id": f"sensor_{sensor_id}",

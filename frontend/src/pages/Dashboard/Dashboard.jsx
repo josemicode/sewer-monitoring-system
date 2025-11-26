@@ -54,21 +54,44 @@ const Dashboard = () => {
         }
     }, [showAggregated]);
 
-    // Merge historical and real-time data
-    const getMergedData = (sensorId) => {
-        const historical = historicalData[sensorId] || [];
-        const current = sensors[sensorId];
+    // Prepare unified chart data
+    const chartData = React.useMemo(() => {
+        const dataMap = new Map();
 
-        if (!current) return historical;
+        // Helper to add points to the map
+        const addPoints = (sensorId, points) => {
+            points.forEach(point => {
+                // Round time to nearest second to ensure matching
+                const date = new Date(point.time);
+                date.setMilliseconds(0);
+                const timeKey = date.toISOString();
 
-        // Add current value if newer than last historical point
-        const lastHistorical = historical[historical.length - 1];
-        if (!lastHistorical || new Date(current.timestamp) > new Date(lastHistorical.time)) {
-            return [...historical, { time: current.timestamp, value: current.value }];
-        }
+                if (!dataMap.has(timeKey)) {
+                    dataMap.set(timeKey, { time: timeKey });
+                }
+                dataMap.get(timeKey)[sensorId] = point.value;
+            });
+        };
 
-        return historical;
-    };
+        SENSORS.forEach(sensorId => {
+            // 1. Historical Data
+            const history = historicalData[sensorId] || [];
+            addPoints(sensorId, history);
+
+            // 2. Real-time Data (Current Sensor State)
+            // We append the current sensor value if it's newer than the last history point
+            const current = sensors[sensorId];
+            if (current) {
+                const lastHist = history[history.length - 1];
+                if (!lastHist || new Date(current.timestamp) > new Date(lastHist.time)) {
+                    addPoints(sensorId, [{ time: current.timestamp, value: current.value }]);
+                }
+            }
+        });
+
+        // Convert map to array and sort by time
+        return Array.from(dataMap.values()).sort((a, b) => new Date(a.time) - new Date(b.time));
+    }, [historicalData, sensors]);
 
     return (
         <div className={styles.container}>
@@ -128,35 +151,33 @@ const Dashboard = () => {
                     <div className={styles.loading}>Loading...</div>
                 ) : (
                     <ResponsiveContainer width="100%" height={400}>
-                        <LineChart margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <LineChart
+                            data={chartData}
+                            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                        >
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                                 dataKey="time"
-                                type="category"
-                                allowDuplicatedCategory={false}
                                 tickFormatter={(time) => new Date(time).toLocaleTimeString()}
                             />
                             <YAxis />
                             <Tooltip
                                 labelFormatter={(time) => new Date(time).toLocaleString()}
-                                formatter={(value) => value.toFixed(2)}
+                                formatter={(value) => value?.toFixed(2)}
                             />
                             <Legend />
-                            {SENSORS.map((sensorId, index) => {
-                                const data = getMergedData(sensorId);
-                                return (
-                                    <Line
-                                        key={sensorId}
-                                        data={data}
-                                        type="monotone"
-                                        dataKey="value"
-                                        stroke={COLORS[index]}
-                                        name={sensorId}
-                                        dot={false}
-                                        strokeWidth={2}
-                                    />
-                                );
-                            })}
+                            {SENSORS.map((sensorId, index) => (
+                                <Line
+                                    key={sensorId}
+                                    type="monotone"
+                                    dataKey={sensorId}
+                                    stroke={COLORS[index]}
+                                    name={sensorId}
+                                    dot={false}
+                                    strokeWidth={2}
+                                    connectNulls // Connect lines if some sensors miss a beat
+                                />
+                            ))}
                         </LineChart>
                     </ResponsiveContainer>
                 )}
