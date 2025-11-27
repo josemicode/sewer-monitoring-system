@@ -191,8 +191,9 @@ def get_history_aggregated(start_date: str, aggregation: str = "hour", query_api
     min = base |> aggregateWindow(every: {window_period}, fn: min, createEmpty: false) |> map(fn: (r) => ({{r with _field: "min"}}))
     max = base |> aggregateWindow(every: {window_period}, fn: max, createEmpty: false) |> map(fn: (r) => ({{r with _field: "max"}}))
     mean = base |> aggregateWindow(every: {window_period}, fn: mean, createEmpty: false) |> map(fn: (r) => ({{r with _field: "mean"}}))
+    std = base |> aggregateWindow(every: {window_period}, fn: stddev, createEmpty: false) |> map(fn: (r) => ({{r with _field: "std"}}))
 
-    union(tables: [min, max, mean])
+    union(tables: [min, max, mean, std])
       |> pivot(rowKey:["_time", "sensor_id"], columnKey: ["_field"], valueColumn: "_value")
     '''
 
@@ -210,7 +211,8 @@ def get_history_aggregated(start_date: str, aggregation: str = "hour", query_api
                 "sensor_id": record.values.get("sensor_id"),
                 "min": record.values.get("min"),
                 "max": record.values.get("max"),
-                "avg": record.values.get("mean")
+                "avg": record.values.get("mean"),
+                "std": record.values.get("std")
             })
     
     #? Why do we raise the same exception here?

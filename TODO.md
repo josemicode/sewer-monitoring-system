@@ -2,11 +2,11 @@
 - [x] Add authentication
 - [x] Create a dashboard frontend
 - Implement component resilience for:
-    - InfluxDB
-    - Consumer
-    - Producer
+    - [ ] InfluxDB
+    - [ ] Consumer
+    - [ ] Producer
 - [x] Fix the websocket connection
 - [x] Make it so the sensor data is matched in time
 - The "Waiting for background tasks to complete. (CTRL+C to force quit)" incident
 - [ ] Show consumer lag in the dashboard (as a minor graph, could be a number, changing color)
-- [ ] Make colors consistent
+- [x] Make colors consistent

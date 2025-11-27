@@ -65,7 +65,10 @@ docker exec -it influxdb influx query 'from(bucket: "${INFLUXDB_BUCKET}") |> ran
 
 7. Test the API:
 - Run the api.py file
-- Access th Swagger UI at http://localhost:8000/docs
+```bash
+python api.py
+```
+- Access the Swagger UI at http://localhost:8000/docs
 - Test the endpoints, Example (get the aggregated data for the last hour):
 ```bash
 curl -X 'GET' \

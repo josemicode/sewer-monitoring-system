@@ -198,7 +198,7 @@ const Dashboard = () => {
             {/* Aggregated Stats Chart */}
             {showAggregated && aggregatedData.length > 0 && (
                 <div className={styles.chartSection}>
-                    <h2>Aggregated Statistics (Min/Max/Avg)</h2>
+                    <h2>Aggregated Statistics (Min/Max/Avg/Std)</h2>
                     {SENSORS.map((sensorId, index) => {
                         const sensorAggData = aggregatedData.filter(d => d.sensor_id === sensorId);
                         if (sensorAggData.length === 0) return null;
@@ -219,9 +219,10 @@ const Dashboard = () => {
                                             formatter={(value) => value?.toFixed(2)}
                                         />
                                         <Legend />
-                                        <Line type="monotone" dataKey="min" stroke="#10b981" name="Min" />
+                                        <Line type="monotone" dataKey="min" stroke="#02fff7ff" name="Min" />
                                         <Line type="monotone" dataKey="avg" stroke={COLORS[index]} name="Avg" strokeWidth={2} />
-                                        <Line type="monotone" dataKey="max" stroke="#ef4444" name="Max" />
+                                        <Line type="monotone" dataKey="max" stroke="#ff0000ff" name="Max" />
+                                        <Line type="monotone" dataKey="std" stroke="#a319966a" name="Std" />
                                     </LineChart>
                                 </ResponsiveContainer>
                             </div>
