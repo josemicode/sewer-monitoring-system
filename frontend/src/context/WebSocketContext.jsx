@@ -6,7 +6,16 @@ export const WebSocketProvider = ({ children }) => {
     const [lastMessage, setLastMessage] = useState(null);
     const [sensors, setSensors] = useState({});
     const [isConnected, setIsConnected] = useState(false);
-    const [alerts, setAlerts] = useState([]);
+
+    // Initialize alerts from localStorage
+    const [alerts, setAlerts] = useState(() => {
+        try {
+            const saved = localStorage.getItem('sensor_alerts');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            return [];
+        }
+    });
 
     // Initialize thresholds from localStorage or default
     const [thresholds, setThresholds] = useState(() => {
@@ -33,6 +42,18 @@ export const WebSocketProvider = ({ children }) => {
             const newThresholds = { ...prev, [sensorId]: parseFloat(value) };
             localStorage.setItem('sensor_thresholds', JSON.stringify(newThresholds));
             return newThresholds;
+        });
+    };
+
+    const acknowledgeAlert = (timestamp, sensorId) => {
+        setAlerts(prev => {
+            const newAlerts = prev.map(a =>
+                (a.timestamp === timestamp && a.sensor_id === sensorId)
+                    ? { ...a, acknowledged: true }
+                    : a
+            );
+            localStorage.setItem('sensor_alerts', JSON.stringify(newAlerts));
+            return newAlerts;
         });
     };
 
@@ -84,10 +105,21 @@ export const WebSocketProvider = ({ children }) => {
 
                     // Handle Alerts
                     if (isUserAlert) {
+                        const alertData = { ...data, is_alert: true, threshold: userThreshold, acknowledged: false };
                         setAlerts((prev) => {
+                            // Prevent duplicates
+                            const isDuplicate = prev.some(a =>
+                                a.sensor_id === alertData.sensor_id &&
+                                a.timestamp === alertData.timestamp
+                            );
+
+                            if (isDuplicate) return prev;
+
                             // Avoid duplicate alerts for the same sensor if very close in time? 
                             // For now, I'll insert on the front. We can filter in UI (or not).
-                            return [data, ...prev].slice(0, 50); // Keep last 50
+                            const newAlerts = [alertData, ...prev].slice(0, 50); // Keep last 50
+                            localStorage.setItem('sensor_alerts', JSON.stringify(newAlerts));
+                            return newAlerts;
                         });
                     }
 
@@ -119,7 +151,7 @@ export const WebSocketProvider = ({ children }) => {
     }, []);
 
     return (
-        <WebSocketContext.Provider value={{ lastMessage, sensors, isConnected, alerts, thresholds, updateThreshold }}>
+        <WebSocketContext.Provider value={{ lastMessage, sensors, isConnected, alerts, thresholds, updateThreshold, acknowledgeAlert }}>
             {children}
         </WebSocketContext.Provider>
     );

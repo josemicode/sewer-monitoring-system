@@ -7,6 +7,8 @@
     - [ ] Producer
 - [x] Fix the websocket connection
 - [x] Make it so the sensor data is matched in time
-- The "Waiting for background tasks to complete. (CTRL+C to force quit)" incident
-- [ ] Show consumer lag in the dashboard (as a minor graph, could be a number, changing color)
+- [x] The "Waiting for background tasks to complete. (CTRL+C to force quit)" incident
+- [x] Show consumer lag in the dashboard (as a minor graph, could be a number, changing color)
 - [x] Make colors consistent
+- [x] Make it so the dashboard shows the last month of data
+- [x] Make it so the alerts disappear/stay grayed out from their section after being acknowledged

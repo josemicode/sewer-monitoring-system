@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useWebSocket } from '../../context/WebSocketContext';
-import { getHistoryRaw, getHistoryAggregated } from '../../api';
+import { getHistoryRaw, getHistoryAggregated, getSystemStatus } from '../../api';
 import DebugPanel from '../../components/DebugPanel/DebugPanel';
 import AlertModal from '../../components/AlertModal/AlertModal';
 import styles from './Dashboard.module.css';
@@ -17,6 +17,22 @@ const Dashboard = () => {
     const [showAggregated, setShowAggregated] = useState(false);
     const [showNotifications, setShowNotifications] = useState(true);
     const [loading, setLoading] = useState(false);
+    const [systemStatus, setSystemStatus] = useState(null);
+
+    useEffect(() => {
+        const fetchStatus = async () => {
+            try {
+                const status = await getSystemStatus();
+                setSystemStatus(status);
+            } catch (error) {
+                console.error('Error fetching system status:', error);
+            }
+        };
+
+        fetchStatus();
+        const interval = setInterval(fetchStatus, 5000);
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         loadHistoricalData();
@@ -122,6 +138,7 @@ const Dashboard = () => {
                         <option value="-1h">Last Hour</option>
                         <option value="-24h">Last Day</option>
                         <option value="-7d">Last Week</option>
+                        <option value="-30d">Last Month</option>
                     </select>
                 </div>
             </div>
@@ -154,6 +171,21 @@ const Dashboard = () => {
                         </div>
                     );
                 })}
+
+                {/* System Status Card */}
+                <div className={styles.sensorCard}>
+                    <h3>System Health</h3>
+                    <div className={styles.value} style={{
+                        color: !systemStatus ? '#9ca3af' :
+                            systemStatus.consumer_lag < 10 ? '#10b981' :
+                                systemStatus.consumer_lag < 100 ? '#f59e0b' : '#ef4444'
+                    }}>
+                        {systemStatus ? systemStatus.consumer_lag : '--'}
+                    </div>
+                    <div className={styles.thresholdControl}>
+                        <span style={{ fontSize: '0.75rem' }}>Consumer Lag</span>
+                    </div>
+                </div>
             </div>
 
             {/* Multi-Sensor Chart */}

@@ -13,6 +13,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, D
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from aiokafka import AIOKafkaConsumer
+from kafka import KafkaAdminClient, TopicPartition
 from influxdb_client import InfluxDBClient
 from dotenv import load_dotenv
 
@@ -94,6 +95,56 @@ async def log_alarm(db: Session, sensor_id: str, value: float) -> AlarmLog:
     db.refresh(alarm)
     return alarm
 
+def get_consumer_lag(group_id: str) -> int:
+    """
+    Calculates the total consumer lag for a given group ID.
+    """
+    try:
+        admin_client = KafkaAdminClient(bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS)
+        
+        # Get partitions for the topic
+        # We assume the topic exists and we know the name
+        # Ideally we fetch metadata, but for this specific setup we know it's TOPIC_NAME
+        # However, AdminClient doesn't have a simple "get partitions" for a topic without describing.
+        # A simpler way with AdminClient is list_consumer_group_offsets.
+        
+        group_offsets = admin_client.list_consumer_group_offsets(group_id)
+        
+        if not group_offsets:
+            return 0
+            
+        total_lag = 0
+        
+        # We need to get the end offsets for these partitions to calculate lag
+        # AdminClient doesn't fetch end offsets directly easily. 
+        # We might need a standard KafkaConsumer for that or use the low-level list_offsets.
+        # Actually, creating a temporary KafkaConsumer is often the easiest way to get end_offsets 
+        # without joining the group.
+        
+        from kafka import KafkaConsumer
+        consumer = KafkaConsumer(
+            bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+            group_id=None, # Don't join a group
+            enable_auto_commit=False
+        )
+        
+        # Get end offsets for all partitions in the group offsets
+        partitions = [tp for tp in group_offsets.keys()]
+        end_offsets = consumer.end_offsets(partitions)
+        
+        for tp, offset_metadata in group_offsets.items():
+            current_offset = offset_metadata.offset
+            end_offset = end_offsets.get(tp, current_offset)
+            total_lag += max(0, end_offset - current_offset)
+            
+        consumer.close()
+        admin_client.close()
+        
+        return total_lag
+    except Exception as e:
+        print(f"Error calculating lag: {e}")
+        return -1
+
 #* --- Endpoints ---
 #? When is this code run?
 # When a client connects to the WebSocket endpoint, every time a new message is received, and when the client disconnects.
@@ -155,11 +206,16 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
             await websocket.send_json(response_data)
     except WebSocketDisconnect:
         print("Client disconnected")
+    except asyncio.CancelledError:
+        print("WebSocket task cancelled")
     except Exception as e:
         print(f"WebSocket Error: {e}")
     finally:
         print("Stopping WebSocket consumer...")
-        await consumer.stop()
+        try:
+            await asyncio.wait_for(consumer.stop(), timeout=2.0)
+        except (Exception, asyncio.CancelledError):
+            pass
 
 
 '''
@@ -292,6 +348,19 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     return {"username": user.username, "id": user.id}
+
+@app.get("/system/status")
+def get_system_status():
+    """
+    Returns system health metrics, including consumer lag.
+    """
+    # The consumer group ID used in consumer.py is 'sensor_group'
+    lag = get_consumer_lag('sensor_group')
+    return {
+        "status": "ok",
+        "consumer_lag": lag,
+        "timestamp": datetime.utcnow()
+    }
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

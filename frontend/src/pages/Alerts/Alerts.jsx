@@ -1,34 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useWebSocket } from '../../context/WebSocketContext';
-import { acknowledgeAlarm } from '../../api';
 import styles from './Alerts.module.css';
 
 const Alerts = () => {
-    const { alerts } = useWebSocket();
-    const [acknowledgedIds, setAcknowledgedIds] = useState(new Set());
-    const [loading, setLoading] = useState({});
+    const { alerts, acknowledgeAlert } = useWebSocket();
+    const [hideAcknowledged, setHideAcknowledged] = useState(false);
 
-    const handleAcknowledge = async (alert, index) => {
-        // Since we don't have alarm_id from WebSocket, we'll use a workaround
-        // In a real app, alerts would be fetched from the backend with IDs
-        setLoading({ ...loading, [index]: true });
-
-        try {
-            // For demo purposes, we'll just mark it as acknowledged locally
-            // In production, you'd call: await acknowledgeAlarm(alert.id);
-            setTimeout(() => {
-                setAcknowledgedIds(new Set([...acknowledgedIds, index]));
-                setLoading({ ...loading, [index]: false });
-            }, 500);
-        } catch (error) {
-            console.error('Error acknowledging alarm:', error);
-            setLoading({ ...loading, [index]: false });
-        }
-    };
+    const activeAlerts = alerts.filter(a => !a.acknowledged);
+    const ackAlerts = alerts.filter(a => a.acknowledged);
 
     return (
         <div className={styles.container}>
-            <h1>Alert History</h1>
+            <div className={styles.header}>
+                <h1>Alert History</h1>
+                <label className={styles.checkbox}>
+                    <input
+                        type="checkbox"
+                        checked={hideAcknowledged}
+                        onChange={(e) => setHideAcknowledged(e.target.checked)}
+                    />
+                    Hide Acknowledged
+                </label>
+            </div>
 
             {alerts.length === 0 ? (
                 <div className={styles.empty}>
@@ -37,10 +30,11 @@ const Alerts = () => {
                 </div>
             ) : (
                 <div className={styles.alertList}>
-                    {alerts.map((alert, index) => (
+                    {/* Active Alerts */}
+                    {activeAlerts.map((alert, index) => (
                         <div
-                            key={index}
-                            className={`${styles.alertCard} ${acknowledgedIds.has(index) ? styles.acknowledged : ''}`}
+                            key={`${alert.sensor_id}-${alert.timestamp}-${index}`}
+                            className={styles.alertCard}
                         >
                             <div className={styles.alertIcon}>⚠️</div>
                             <div className={styles.alertContent}>
@@ -68,17 +62,43 @@ const Alerts = () => {
                                 </div>
                             </div>
                             <div className={styles.actions}>
-                                {acknowledgedIds.has(index) ? (
-                                    <span className={styles.acknowledgedBadge}>✓ Acknowledged</span>
-                                ) : (
-                                    <button
-                                        onClick={() => handleAcknowledge(alert, index)}
-                                        disabled={loading[index]}
-                                        className={styles.ackButton}
-                                    >
-                                        {loading[index] ? 'Processing...' : 'Acknowledge'}
-                                    </button>
-                                )}
+                                <button
+                                    onClick={() => acknowledgeAlert(alert.timestamp, alert.sensor_id)}
+                                    className={styles.ackButton}
+                                >
+                                    Acknowledge
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+
+                    {/* Acknowledged Alerts */}
+                    {!hideAcknowledged && ackAlerts.map((alert, index) => (
+                        <div
+                            key={`${alert.sensor_id}-${alert.timestamp}-${index}`}
+                            className={`${styles.alertCard} ${styles.acknowledged}`}
+                        >
+                            <div className={styles.alertIcon}>✓</div>
+                            <div className={styles.alertContent}>
+                                <div className={styles.alertHeader}>
+                                    <h3>{alert.sensor_id?.replace('_', ' ').toUpperCase()}</h3>
+                                    <span className={styles.timestamp}>
+                                        {new Date(alert.timestamp).toLocaleString()}
+                                    </span>
+                                </div>
+                                <div className={styles.alertDetails}>
+                                    <div className={styles.metric}>
+                                        <span className={styles.label}>Value:</span>
+                                        <span className={styles.value}>{alert.value?.toFixed(2)}</span>
+                                    </div>
+                                    <div className={styles.metric}>
+                                        <span className={styles.label}>Threshold:</span>
+                                        <span className={styles.value}>{alert.threshold}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className={styles.actions}>
+                                <span className={styles.acknowledgedBadge}>Acknowledged</span>
                             </div>
                         </div>
                     ))}

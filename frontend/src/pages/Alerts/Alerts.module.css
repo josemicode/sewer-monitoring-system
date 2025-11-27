@@ -141,3 +141,26 @@
     border-radius: var(--radius-md);
     font-weight: 600;
 }
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.header h1 {
+    margin-bottom: 0;
+}
+
+.checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    color: var(--color-text);
+}
+
+.checkbox input {
+    cursor: pointer;
+}

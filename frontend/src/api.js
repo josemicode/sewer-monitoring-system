@@ -33,4 +33,9 @@ export const acknowledgeAlarm = async (alarmId) => {
     return response.data;
 };
 
+export const getSystemStatus = async () => {
+    const response = await api.get('/system/status');
+    return response.data;
+};
+
 export default api;
