@@ -14,7 +14,8 @@ KAFKA_BOOTSTRAP_SERVERS = 'localhost:29092'
 TOPIC_NAME = 'sensor_stream'
 
 # InfluxDB Config
-INFLUXDB_URL = "http://localhost:8086"
+INFLUXDB_URL_PRIMARY = "http://localhost:8086"
+INFLUXDB_URL_SECONDARY = "http://localhost:8087"
 INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
 INFLUXDB_ORG = os.getenv("INFLUXDB_ORG")
 INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET")
@@ -43,8 +44,11 @@ def get_consumer_lag(consumer):
     return lag_info
 
 def main():
+    current_influx_url = INFLUXDB_URL_PRIMARY
+    
     # Initialize InfluxDB Client
-    client = InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
+    print(f"Connecting to InfluxDB at {current_influx_url}...")
+    client = InfluxDBClient(url=current_influx_url, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
     write_api = client.write_api(write_options=SYNCHRONOUS)
     
     # Initialize Kafka Consumer
@@ -81,9 +85,27 @@ def main():
                     consumer.commit()
                     break # Exit retry loop
                 except Exception as e:
-                    print(f"Error writing to InfluxDB: {e}")
-                    print("Retrying in 5 seconds...")
-                    time.sleep(5)
+                    print(f"Error writing to InfluxDB at {current_influx_url}: {e}")
+                    
+                    # Switch URL
+                    if current_influx_url == INFLUXDB_URL_PRIMARY:
+                        current_influx_url = INFLUXDB_URL_SECONDARY
+                    else:
+                        current_influx_url = INFLUXDB_URL_PRIMARY
+                        
+                    print(f"⚠️ Switching InfluxDB to {current_influx_url}...")
+                    
+                    # Close old client and create new one
+                    try:
+                        client.close()
+                    except:
+                        pass
+                        
+                    client = InfluxDBClient(url=current_influx_url, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
+                    write_api = client.write_api(write_options=SYNCHRONOUS)
+                    
+                    print("Retrying in 2 seconds...")
+                    time.sleep(2)
             
             message_count += 1
             

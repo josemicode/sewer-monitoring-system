@@ -25,7 +25,8 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 # Configuration
 KAFKA_BOOTSTRAP_SERVERS = 'localhost:29092'
 TOPIC_NAME = 'sensor_stream'
-INFLUXDB_URL = "http://localhost:8086"
+INFLUXDB_URL_PRIMARY = "http://localhost:8086"
+INFLUXDB_URL_SECONDARY = "http://localhost:8087"
 INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
 INFLUXDB_ORG = os.getenv("INFLUXDB_ORG")
 INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET")
@@ -79,8 +80,21 @@ def get_db() -> Session:
     finally:
         db.close()
 
+def get_influx_client():
+    urls = [INFLUXDB_URL_PRIMARY, INFLUXDB_URL_SECONDARY]
+    for url in urls:
+        try:
+            client = InfluxDBClient(url=url, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
+            if client.ping():
+                print(f"Connected to InfluxDB at {url}")
+                return client
+        except Exception as e:
+            print(f"Failed to connect to InfluxDB at {url}: {e}")
+            continue
+    raise HTTPException(status_code=503, detail="Could not connect to any InfluxDB instance")
+
 def get_influx_query_api():
-    client = InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
+    client = get_influx_client()
     return client.query_api()
 
 #* --- Helpers ---

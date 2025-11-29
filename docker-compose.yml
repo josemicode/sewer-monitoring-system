@@ -34,9 +34,9 @@ services:
       - sensor_net
     restart: always
 
-  influxdb:
+  influx_primary:
     image: influxdb:2.7
-    container_name: influxdb
+    container_name: influx_primary
     ports:
       - "8086:8086"
     environment:
@@ -48,6 +48,24 @@ services:
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN}
     volumes:
       - influxdb_data:/var/lib/influxdb2
+    networks:
+      - sensor_net
+    restart: always
+
+  influx_secondary:
+    image: influxdb:2.7
+    container_name: influx_secondary
+    ports:
+      - "8087:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USERNAME}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN}
+    volumes:
+      - influxdb_secondary_data:/var/lib/influxdb2
     networks:
       - sensor_net
     restart: always
@@ -71,4 +89,5 @@ networks:
 
 volumes:
   influxdb_data:
+  influxdb_secondary_data:
   portainer_data:

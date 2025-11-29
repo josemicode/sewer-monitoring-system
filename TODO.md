@@ -2,7 +2,7 @@
 - [x] Add authentication
 - [x] Create a dashboard frontend
 - Implement component resilience for:
-    - [ ] InfluxDB
+    - [x] InfluxDB
     - [ ] Consumer
     - [ ] Producer
 - [x] Fix the websocket connection
