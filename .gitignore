@@ -3,3 +3,4 @@ venv/
 system.log
 alerts.db
 __pycache__/
+logs/
