@@ -1,0 +1,4 @@
+Here is the directory where the data is stored
+The data in alerts.db is:
+    - The alerts that have been triggered
+    - The users (both for authentication and for acknowledging alerts)
