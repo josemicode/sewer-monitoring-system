@@ -33,7 +33,7 @@ INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET")
 ALERT_THRESHOLD = 28.0  # Trigger alert if value > 28.0 (Sine wave max is 30)
 
 # Database Setup (SQLite)
-SQLALCHEMY_DATABASE_URL = "sqlite:///./alerts.db"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./data/alerts.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 LocalSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

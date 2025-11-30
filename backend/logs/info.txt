@@ -1,0 +1,2 @@
+Here is the directory where the logs are stored
+Although we already have system logs, we store the entire flow as well
