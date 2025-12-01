@@ -3,8 +3,8 @@
 - [x] Create a dashboard frontend
 - Implement component resilience for:
     - [x] InfluxDB
-    - [ ] Consumer
-    - [ ] Producer
+    - [x] Consumer
+    - [x] Producer
 - [x] Fix the websocket connection
 - [x] Make it so the sensor data is matched in time
 - [x] The "Waiting for background tasks to complete. (CTRL+C to force quit)" incident
