@@ -1,87 +1,95 @@
 # Sewer Monitoring System
 
-Installation Guide:
+A resilient, distributed system for real-time sewer sensor monitoring, featuring automatic failover and high-throughput data processing.
 
-1. Clone the repository:
+## Prerequisites
+
+- **Docker & Docker Compose** (for Infrastructure)
+- **Python 3.8+** (for Backend)
+- **Node.js 16+** (for Frontend)
+
+## Installation
+
+### 1. Infrastructure Setup
+
+Clone the repo and configure the environment:
 
 ```bash
 git clone https://github.com/your-username/sewer-monitoring-system.git
 cd sewer-monitoring-system
-```
-
-2. Create a .env file based on the example:
-
-```bash
 cp .env.example .env
 ```
 
-3. Build and run the containers:
+Start the core services (Kafka, Zookeeper, InfluxDB Primary & Secondary):
 
 ```bash
-docker-compose up --build
+docker-compose up -d --build
 ```
 
-4. Access the application:
-   (curl for testing)
+### 2. Backend Setup
+
+Navigate to the backend and install dependencies:
 
 ```bash
-curl -I http://localhost:8086/health; docker exec kafka kafka-topics --bootstrap-server localhost:9092 --list
-```
-
-- InfluxDB: http://localhost:8086
-- Portainer: http://localhost:9000
-
-5. Install backend dependencies:
-
-- Go to backend and run this command to get a virtual enviroment for pip packages.
-(And source it to use it)
-
-```bash
+cd backend
 python -m venv venv
-```
-```bash
+# Windows:
+venv\Scripts\activate
+# Linux/Mac:
 source venv/bin/activate
-```
 
-- Now install the libraries
-```bash
 pip install -r requirements.txt
 ```
 
-6. Run both the consumer and producer:
+### 3. Frontend Setup
+
+Navigate to the frontend and install dependencies:
 
 ```bash
-python consumer.py
-```
-(in another terminal)
-```bash
-python producers.py
-```
-
-You may now check system.log or run the following command to directly query InfluxDB:
-```bash
-docker exec -it influxdb influx query 'from(bucket: "${INFLUXDB_BUCKET}") |> range(start: -1h)'
-```
-
-7. Test the API:
-- Run the api.py file
-```bash
-python api.py
-```
-- Access the Swagger UI at http://localhost:8000/docs
-- Test the endpoints, Example (get the aggregated data for the last hour):
-```bash
-curl -X 'GET' \
-  'http://localhost:8000/history/aggregated?start_date=-1h&aggregation=hour' \
-  -H 'accept: application/json'
-```
-
-8. Install Node dependencies and run the frontend:
-- Go to frontend and run this command
-```bash
+cd ../frontend
 npm install
 ```
-- Then run the Vite server (Access at http://localhost:5173)
+
+## Running the System
+
+### 1. Start Backend Services
+
+Use the **Orchestrator** to manage API, Consumers, and Sensors automatically:
+
 ```bash
+# From backend/ directory
+python orchestrator.py
+```
+
+_The orchestrator handles process resurrection and logging (see `backend/logs/`)._
+
+### 2. Start Frontend Client
+
+Launch the React dashboard:
+
+```bash
+# From frontend/ directory
 npm run dev
 ```
+
+Access the dashboard at **http://localhost:5173**.
+
+## User Manual
+
+### Dashboard
+
+- **Live Monitor**: View real-time sine wave data from 4 sensors via WebSockets.
+- **Alerts**: Visual indicators trigger when values exceed the threshold (28.0).
+- **History**: Use the date picker to query aggregated historical data from InfluxDB.
+
+### API & Tools
+
+- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs) - Test API endpoints directly.
+- **InfluxDB UI**: [http://localhost:8086](http://localhost:8086) - Login with credentials from `.env`.
+- **Portainer**: [http://localhost:9000](http://localhost:9000) - Manage Docker containers.
+
+## Architecture Highlights
+
+- **Resilience**: Consumer automatically fails over to Secondary InfluxDB on error.
+- **Orchestration**: Python script monitors and restarts dead services.
+- **Performance**: Multiprocessing for sensors, AsyncIO for API, and Kafka for buffering.
