@@ -30,7 +30,7 @@ INFLUXDB_URL_SECONDARY = "http://localhost:8087"
 INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
 INFLUXDB_ORG = os.getenv("INFLUXDB_ORG")
 INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET")
-ALERT_THRESHOLD = 28.0  # Trigger alert if value > 28.0 (Sine wave max is 30)
+ALERT_THRESHOLD = 28.0  # Trigger alert if value > 28.0
 
 # Database Setup (SQLite)
 SQLALCHEMY_DATABASE_URL = "sqlite:///./data/alerts.db"

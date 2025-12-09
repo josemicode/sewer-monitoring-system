@@ -219,7 +219,7 @@ const Dashboard = () => {
                                     name={sensorId}
                                     dot={false}
                                     strokeWidth={2}
-                                    connectNulls // Connect lines if some sensors miss a beat
+                                    connectNulls
                                 />
                             ))}
                         </LineChart>
