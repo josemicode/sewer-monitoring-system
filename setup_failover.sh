@@ -29,7 +29,7 @@ echo "Both instances are configured to initialize with the same environment vari
 echo "To verify that they have the same initial Buckets, Orgs, and Tokens, you can inspect their environment:"
 
 echo ""
-echo "👉 Run the following command to compare the initialization variables:"
+echo "Run the following command to compare the initialization variables:"
 echo "diff <(docker exec influx_primary env | grep DOCKER_INFLUXDB_INIT | sort) <(docker exec influx_secondary env | grep DOCKER_INFLUXDB_INIT | sort)"
 
 echo ""

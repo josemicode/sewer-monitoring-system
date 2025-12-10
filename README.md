@@ -15,7 +15,7 @@ A resilient, distributed system for real-time sewer sensor monitoring, featuring
 Clone the repo and configure the environment:
 
 ```bash
-git clone https://github.com/your-username/sewer-monitoring-system.git
+git clone https://github.com/josemicode/sewer-monitoring-system.git
 cd sewer-monitoring-system
 cp .env.example .env
 ```
@@ -43,7 +43,7 @@ pip install -r requirements.txt
 
 ### 3. Frontend Setup
 
-Navigate to the frontend and install dependencies:
+Navigate to the frontend (in a new bash terminal, for convenience) and install dependencies:
 
 ```bash
 cd ../frontend
@@ -63,7 +63,14 @@ python orchestrator.py
 
 _The orchestrator handles process resurrection and logging (see `backend/logs/`)._
 
-### 2. Start Frontend Client
+### 2. Create User
+We need to register an user to be able to access the dashboard.
+
+```bash
+curl -X POST "http://localhost:8000/users/" -H "Content-Type: application/json" -d '{"username": "testuser", "password_hash": "testpass"}'
+```
+
+### 3. Start Frontend Client
 
 Launch the React dashboard:
 
@@ -78,8 +85,8 @@ Access the dashboard at **http://localhost:5173**.
 
 ### Dashboard
 
-- **Live Monitor**: View real-time sine wave data from 4 sensors via WebSockets.
-- **Alerts**: Visual indicators trigger when values exceed the threshold (28.0).
+- **Live Monitor**: View real-time data from 4 sensors via WebSockets.
+- **Alerts**: Visual indicators trigger when values exceed the threshold (defined by the user or 28 as default).
 - **History**: Use the date picker to query aggregated historical data from InfluxDB.
 
 ### API & Tools

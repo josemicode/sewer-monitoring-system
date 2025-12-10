@@ -73,7 +73,7 @@ def main():
             p, log_file = p_info
             if p.poll() is None:
                 print(f"Terminating {name}...")
-                # Send SIGINT to allow graceful shutdown (e.g. producers cleaning up children)
+                # Send SIGINT to allow graceful shutdown
                 p.send_signal(signal.SIGINT)
                 try:
                     p.wait(timeout=5)

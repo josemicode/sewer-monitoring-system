@@ -26,7 +26,7 @@ def sensor_simulation(sensor_id, lock):
         value_serializer=lambda v: json.dumps(v).encode('utf-8')
     )
     
-    log_file = "system.log"
+    log_file = "logs/sine_data.log"
     
     print(f"Sensor {sensor_id} started.")
     
